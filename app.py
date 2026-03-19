@@ -2,37 +2,27 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 
-st.set_page_config(
-    page_title="환경 보건 정책 분석 대시보드",
-    layout="wide"
-)
+st.set_page_config(page_title="환경 정책 의사결정 대시보드", layout="wide")
 
 # ---------------------------
-# 0. 스타일
+# UI 스타일
 # ---------------------------
 st.markdown("""
-    <style>
-    .main-title {
-        font-size: 32px;
-        font-weight: bold;
-    }
-    .kpi {
-        font-size: 24px;
-        font-weight: bold;
-        color: #2E86C1;
-    }
-    </style>
+<style>
+.big-title {font-size:34px; font-weight:700;}
+.kpi-box {padding:10px; border-radius:10px; background-color:#F4F6F6;}
+</style>
 """, unsafe_allow_html=True)
 
-st.markdown('<p class="main-title">🌍 환경-보건 통합 분석 대시보드</p>', unsafe_allow_html=True)
-st.markdown("NOx 매개효과 기반 정책 시뮬레이션")
+st.markdown('<p class="big-title">🌍 환경-보건 정책 의사결정 시스템</p>', unsafe_allow_html=True)
 
 # ---------------------------
-# 1. 데이터 생성
+# 데이터 생성
 # ---------------------------
 np.random.seed(42)
-n = 50
+n = 100
 
 data = pd.DataFrame({
     "SOx": np.random.uniform(0.01, 0.05, n),
@@ -49,106 +39,143 @@ data["Lung_Disease"] = (
 )
 
 # ---------------------------
-# 2. 사이드바 (정책)
+# 사이드바 (정책 설정)
 # ---------------------------
-st.sidebar.header("📊 정책 시나리오")
+st.sidebar.header("⚙️ 정책 시뮬레이션")
 
-car_reduction = st.sidebar.slider("자가용 이용률 감소 (%)", 0, 50, 10)
-nox_reduction = st.sidebar.slider("NOx 저감 기술 (%)", 0, 50, 10)
+car = st.sidebar.slider("🚗 자가용 감소 (%)", 0, 60, 20)
+nox = st.sidebar.slider("🌫 NOx 저감 (%)", 0, 60, 20)
+policy_type = st.sidebar.selectbox("정책 전략", ["단일 정책", "교통 중심", "통합 정책"])
 
-scenario_data = data.copy()
+scenario = data.copy()
 
-scenario_data["Car_Usage"] *= (1 - car_reduction / 100)
-scenario_data["NOx"] *= (1 - (car_reduction * 0.3) / 100)
-scenario_data["NOx"] *= (1 - nox_reduction / 100)
+if policy_type == "교통 중심":
+    car *= 1.5
+elif policy_type == "통합 정책":
+    car *= 1.3
+    nox *= 1.3
 
-scenario_data["Lung_Disease"] = (
-    100
-    + scenario_data["NOx"] * 1800
-    + scenario_data["SOx"] * 800
+# 적용
+scenario["Car_Usage"] *= (1 - car / 100)
+scenario["NOx"] *= (1 - (car * 0.3) / 100)
+scenario["NOx"] *= (1 - nox / 100)
+
+scenario["Lung_Disease"] = (
+    100 + scenario["NOx"] * 1800 + scenario["SOx"] * 800
 )
 
 # ---------------------------
-# KPI 계산
+# KPI
 # ---------------------------
 before = data["Lung_Disease"].mean()
-after = scenario_data["Lung_Disease"].mean()
-reduction = ((before - after) / before) * 100
+after = scenario["Lung_Disease"].mean()
+change = ((before - after) / before) * 100
+
+high_risk_before = (data["Lung_Disease"] > 180).sum()
+high_risk_after = (scenario["Lung_Disease"] > 180).sum()
 
 # ---------------------------
-# 탭 구성
+# KPI 출력
 # ---------------------------
-tab1, tab2, tab3 = st.tabs(["📊 대시보드", "📈 분석", "📋 데이터"])
+col1, col2, col3, col4 = st.columns(4)
 
-# ---------------------------
-# TAB 1: 대시보드
-# ---------------------------
-with tab1:
-    st.subheader("📊 정책 효과 요약")
+col1.metric("기존 평균", f"{before:.1f}")
+col2.metric("정책 후", f"{after:.1f}", f"{after-before:.1f}")
+col3.metric("개선율", f"{change:.2f}%")
+col4.metric("고위험 지역 감소", f"{high_risk_after}", f"{high_risk_after - high_risk_before}")
 
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("기존 폐질환 지수", f"{before:.1f}")
-    col2.metric("정책 적용 후", f"{after:.1f}", f"{after-before:.1f}")
-    col3.metric("개선율 (%)", f"{reduction:.2f}%")
-
-    st.markdown("---")
-
-    st.subheader("📉 폐질환 분포 변화")
-
-    combined = pd.concat([
-        data.assign(Type="기존"),
-        scenario_data.assign(Type="정책 적용")
-    ])
-
-    fig = px.histogram(
-        combined,
-        x="Lung_Disease",
-        color="Type",
-        barmode="overlay",
-        nbins=20,
-        opacity=0.6
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
+st.markdown("---")
 
 # ---------------------------
-# TAB 2: 분석
+# 1. 분포 비교
 # ---------------------------
-with tab2:
-    st.subheader("📈 NOx vs 폐질환 관계")
+st.subheader("📊 정책 전후 분포 변화")
 
-    fig2 = px.scatter(
-        data,
-        x="NOx",
-        y="Lung_Disease",
-        size="Car_Usage",
-        color="Pop_Density",
-        title="NOx가 폐질환에 미치는 영향"
-    )
+fig1 = go.Figure()
 
-    st.plotly_chart(fig2, use_container_width=True)
+fig1.add_trace(go.Histogram(x=data["Lung_Disease"], name="기존", opacity=0.6))
+fig1.add_trace(go.Histogram(x=scenario["Lung_Disease"], name="정책", opacity=0.6))
 
-    st.subheader("🧠 핵심 인사이트")
+fig1.update_layout(barmode="overlay")
 
-    corr = data["NOx"].corr(data["Lung_Disease"])
-
-    st.markdown(f"""
-    - NOx와 폐질환 상관계수: **{corr:.2f}**
-    - 자가용 이용률은 NOx를 매개로 간접 영향
-    - 정책 효과는 교통 + 환경 동시 개입 시 극대화
-    """)
+st.plotly_chart(fig1, use_container_width=True)
 
 # ---------------------------
-# TAB 3: 데이터
+# 2. 민감도 분석
 # ---------------------------
-with tab3:
-    st.subheader("📋 데이터 테이블")
+st.subheader("📈 정책 민감도 분석 (NOx vs 폐질환)")
 
-    st.dataframe(scenario_data)
+x_vals = np.linspace(0.02, 0.08, 50)
+y_vals = 100 + x_vals * 1800
 
-    st.download_button(
-        "CSV 다운로드",
-        scenario_data.to_csv(index=False),
-        file_name="environment_health_data.csv"
-    )
+fig2 = px.line(x=x_vals, y=y_vals, labels={"x": "NOx", "y": "폐질환"})
+st.plotly_chart(fig2, use_container_width=True)
+
+# ---------------------------
+# 3. 리스크 구간 분석
+# ---------------------------
+st.subheader("🚨 고위험 구간 분석")
+
+scenario["Risk"] = pd.cut(
+    scenario["Lung_Disease"],
+    bins=[0, 140, 180, 300],
+    labels=["Low", "Medium", "High"]
+)
+
+risk_count = scenario["Risk"].value_counts().reset_index()
+
+fig3 = px.bar(
+    risk_count,
+    x="Risk",
+    y="count",
+    title="리스크 구간 분포"
+)
+
+st.plotly_chart(fig3, use_container_width=True)
+
+# ---------------------------
+# 4. 다변수 관계
+# ---------------------------
+st.subheader("🌐 다변수 영향 분석")
+
+fig4 = px.scatter(
+    scenario,
+    x="NOx",
+    y="Lung_Disease",
+    size="Car_Usage",
+    color="Pop_Density",
+    hover_data=["SOx"]
+)
+
+st.plotly_chart(fig4, use_container_width=True)
+
+# ---------------------------
+# 5. 자동 정책 해석
+# ---------------------------
+st.subheader("🧠 정책 해석")
+
+if change > 15:
+    st.success("강력한 정책 효과: 통합 정책이 매우 효과적입니다.")
+elif change > 5:
+    st.warning("중간 수준 효과: 추가 정책 필요")
+else:
+    st.error("효과 미미: 구조적 접근 필요")
+
+st.markdown(f"""
+- 평균 폐질환 감소율: **{change:.2f}%**
+- NOx 감소가 주요 기여 요인
+- 자가용 정책은 간접 효과 중심
+""")
+
+# ---------------------------
+# 6. 데이터
+# ---------------------------
+st.subheader("📋 데이터")
+
+st.dataframe(scenario)
+
+st.download_button(
+    "CSV 다운로드",
+    scenario.to_csv(index=False),
+    file_name="policy_simulation.csv"
+)
