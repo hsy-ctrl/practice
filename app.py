@@ -40,6 +40,8 @@ nox_reduction = st.sidebar.slider("NOx 저감 기술 (%)", 0, 50, 0)
 
 # 정책 반영
 scenario_data = data.copy()
+
+# 자가용 감소
 scenario_data["Car_Usage"] *= (1 - car_reduction / 100)
 
 # Car → NOx 간접 영향 반영
@@ -56,15 +58,21 @@ scenario_data["Lung_Disease"] = (
 )
 
 # ---------------------------
-# 3. 상관관계 시각화
+# 3. 분포 비교 시각화 (히스토그램)
 # ---------------------------
-st.subheader("📈 NOx vs 폐질환")
+st.subheader("📊 폐질환 분포 변화 (정책 효과)")
 
 fig, ax = plt.subplots()
-ax.scatter(data["NOx"], data["Lung_Disease"], label="기존", alpha=0.7)
-ax.scatter(scenario_data["NOx"], scenario_data["Lung_Disease"], label="정책 적용", alpha=0.7)
-ax.set_xlabel("NOx 농도")
-ax.set_ylabel("폐질환 지수")
+
+ax.hist(data["Lung_Disease"], bins=15, alpha=0.5, label="기존")
+ax.hist(scenario_data["Lung_Disease"], bins=15, alpha=0.5, label="정책 적용")
+
+# 평균선 추가
+ax.axvline(data["Lung_Disease"].mean(), linestyle="--", label="기존 평균")
+ax.axvline(scenario_data["Lung_Disease"].mean(), linestyle="--", label="정책 평균")
+
+ax.set_xlabel("폐질환 지수")
+ax.set_ylabel("빈도")
 ax.legend()
 
 st.pyplot(fig)
