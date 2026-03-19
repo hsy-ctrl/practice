@@ -163,3 +163,11 @@ st.dataframe(
     ]].sort_values(by="주차가능대수", ascending=False),
     use_container_width=True
 )
+info_file = st.file_uploader("주차장 정보 CSV 업로드")
+live_file = st.file_uploader("실시간 CSV 업로드")
+
+if info_file and live_file:
+    df_info = pd.read_csv(info_file, encoding="cp949")
+    df_live = pd.read_csv(live_file, encoding="cp949")
+else:
+    st.stop()
