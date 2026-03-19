@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 
-st.set_page_config(page_title="서울 주차장 대시보드", layout="wide")
+st.set_page_config(page_title="parking", layout="wide")
 
 # ==============================
 # 데이터 로드 (에러 방지 강화)
