@@ -33,12 +33,25 @@ html, body, [class*="css"] { font-family: 'Noto Sans KR', sans-serif; }
 
 
 # ─────────────────────────────────────────
-# CSV 경로 — app.py 위치 기준으로 자동 탐색
-# ★ 수정 핵심: 터미널 실행 위치와 무관하게 app.py 옆 폴더에서 찾음
+# CSV 경로 탐색 — 언더바 / 띄어쓰기 둘 다 찾음
 # ─────────────────────────────────────────
 BASE_DIR = Path(__file__).parent
-INFO_CSV = BASE_DIR / "서울시_공영주차장_안내_정보.csv"
-RT_CSV   = BASE_DIR / "서울시_시영주차장_실시간_주차대수_정보.csv"
+
+def find_csv(name_underscore: str) -> Path:
+    """
+    언더바 버전과 띄어쓰기 버전을 순서대로 탐색해서
+    존재하는 파일 경로를 반환. 둘 다 없으면 None 반환.
+    """
+    name_space = name_underscore.replace("_", " ")
+    for name in [name_underscore, name_space]:
+        p = BASE_DIR / name
+        if p.exists():
+            return p
+    return None
+
+
+INFO_CSV = find_csv("서울시_공영주차장_안내_정보.csv")
+RT_CSV   = find_csv("서울시_시영주차장_실시간_주차대수_정보.csv")
 
 
 # ─────────────────────────────────────────
@@ -46,20 +59,22 @@ RT_CSV   = BASE_DIR / "서울시_시영주차장_실시간_주차대수_정보.c
 # ─────────────────────────────────────────
 @st.cache_data
 def load_data():
-    if not INFO_CSV.exists():
+    # 파일 존재 여부 체크
+    if INFO_CSV is None:
         st.error(
-            f"**CSV 파일을 찾을 수 없습니다.**\n\n"
-            f"`서울시_공영주차장_안내_정보.csv` 파일을 "
-            f"`app.py`와 **같은 폴더**에 넣어주세요.\n\n"
-            f"현재 찾는 경로: `{INFO_CSV}`"
+            "**CSV 파일을 찾을 수 없습니다.**\n\n"
+            "아래 두 파일을 `app.py`와 **같은 폴더**에 넣어주세요.\n\n"
+            "- `서울시 공영주차장 안내 정보.csv`\n"
+            "- `서울시 시영주차장 실시간 주차대수 정보.csv`\n\n"
+            f"현재 탐색 경로: `{BASE_DIR}`"
         )
         st.stop()
-    if not RT_CSV.exists():
+    if RT_CSV is None:
         st.error(
-            f"**CSV 파일을 찾을 수 없습니다.**\n\n"
-            f"`서울시_시영주차장_실시간_주차대수_정보.csv` 파일을 "
-            f"`app.py`와 **같은 폴더**에 넣어주세요.\n\n"
-            f"현재 찾는 경로: `{RT_CSV}`"
+            "**CSV 파일을 찾을 수 없습니다.**\n\n"
+            "`서울시 시영주차장 실시간 주차대수 정보.csv` 파일을 "
+            "`app.py`와 **같은 폴더**에 넣어주세요.\n\n"
+            f"현재 탐색 경로: `{BASE_DIR}`"
         )
         st.stop()
 
@@ -70,7 +85,7 @@ def load_data():
     info["구"] = info["주소"].str.extract(r"([\w]+구)")
     rt["구"]   = rt["주소"].str.extract(r"([\w]+구)")
 
-    # ★ 수정: info 숫자 컬럼 NaN → 0 (format 오류 방지)
+    # info 숫자 컬럼 NaN → 0
     for col in ["총 주차면", "기본 주차 요금", "기본 주차 시간(분 단위)",
                 "추가 단위 요금", "추가 단위 시간(분 단위)",
                 "일 최대 요금", "월 정기권 금액"]:
@@ -80,7 +95,7 @@ def load_data():
     # 이상치 제거 (총 주차면 10 이하)
     rt = rt[rt["총 주차면"] > 10].copy()
 
-    # ★ 수정: rt 숫자 컬럼 NaN → 0
+    # rt 숫자 컬럼 NaN → 0
     for col in ["기본 주차 요금", "일 최대 요금"]:
         if col in rt.columns:
             rt[col] = pd.to_numeric(rt[col], errors="coerce").fillna(0)
@@ -89,7 +104,7 @@ def load_data():
     rt["이용률"] = (rt["현재 주차 차량수"] / rt["총 주차면"] * 100).round(1).clip(0, 100)
     rt["가용면"] = (rt["총 주차면"] - rt["현재 주차 차량수"]).clip(lower=0)
 
-    # ★ 수정: Categorical → str (Streamlit Arrow 직렬화 오류 방지)
+    # Categorical → str (Streamlit Arrow 직렬화 오류 방지)
     rt["혼잡도"] = pd.cut(
         rt["이용률"],
         bins=[-1, 30, 70, 95, 100],
