@@ -688,13 +688,36 @@ elif "📋" in page:
         mc3.metric("현재 차량",   f"{int(fr2['현재 주차 차량수'].sum()):,}대")
         mc4.metric("가용 면수",   f"{int(fr2['가용면'].sum()):,}면")
 
-        cols_rt = ["구","주차장명","주소","총 주차면","현재 주차 차량수","가용면","이용률","혼잡도","기본 주차 요금","일 최대 요금","평일운영","현재 주차 차량수 업데이트시간"]
+        # 원하는 컬럼과 표시명 쌍으로 관리 — 없는 컬럼은 자동 제외
+        cols_want = [
+            ("구",                          "구"),
+            ("주차장명",                    "주차장명"),
+            ("주소",                        "주소"),
+            ("총 주차면",                   "전체"),
+            ("현재 주차 차량수",            "현재"),
+            ("가용면",                      "가용"),
+            ("이용률",                      "이용률(%)"),
+            ("혼잡도",                      "혼잡도"),
+            ("기본 주차 요금",              "기본요금(원)"),
+            ("일 최대 요금",                "일최대(원)"),
+            ("평일운영",                    "평일운영"),
+            ("현재 주차 차량수 업데이트시간","업데이트"),
+        ]
+        # 실제 존재하는 컬럼만 선택
+        cols_rt  = [c for c, _ in cols_want if c in fr2.columns]
+        cols_ren = [r for c, r in cols_want if c in fr2.columns]
+        # 디버그: 빠진 컬럼 경고
+        missing = [c for c, _ in cols_want if c not in fr2.columns]
+        if missing:
+            st.warning(f"실시간 데이터에 없는 컬럼(자동 제외): {missing}\n실제 컬럼: {fr2.columns.tolist()}")
         disp_rt = fr2[cols_rt].copy()
-        disp_rt.columns = ["구","주차장명","주소","전체","현재","가용","이용률(%)","혼잡도","기본요금(원)","일최대(원)","평일운영","업데이트"]
+        disp_rt.columns = cols_ren
         st.dataframe(
             disp_rt.style.apply(style_util, axis=None)
-                .format({"전체":"{:,.0f}","현재":"{:,.0f}","가용":"{:,.0f}",
-                         "이용률(%)":"{:.1f}","기본요금(원)":"{:,.0f}","일최대(원)":"{:,.0f}"}),
+                .format({k: v for k, v in {
+                    "전체":"{:,.0f}","현재":"{:,.0f}","가용":"{:,.0f}",
+                    "이용률(%)":"{:.1f}","기본요금(원)":"{:,.0f}","일최대(원)":"{:,.0f}"
+                }.items() if k in disp_rt.columns}),
             use_container_width=True, height=480, hide_index=True,
         )
         st.download_button("📥 CSV 다운로드", fr2.to_csv(index=False, encoding="utf-8-sig"),
