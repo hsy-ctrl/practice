@@ -1,200 +1,76 @@
 import streamlit as st
 import pandas as pd
-import pydeck as pdk
 
-st.set_page_config(page_title="Seoul ParkMap", layout="wide")
+st.set_page_config(page_title="서울 공영주차장 현황", layout="wide")
 
-# ==============================
+st.title("🚗 서울 공영주차장 간단 조회")
+st.markdown("구별 주차장 수 및 실시간 주차 대수 확인")
+
+# -------------------------
 # 데이터 로드
-# ==============================
+# -------------------------
 @st.cache_data
 def load_data():
-    df_info = pd.read_csv("parking_info.csv", encoding="cp949")
-    df_live = pd.read_csv("parking_live.csv", encoding="cp949")
+    info = pd.read_csv("서울시 공영주차장 안내 정보.csv", encoding="cp949")
+    realtime = pd.read_csv("서울시 시영주차장 실시간 주차대수 정보.csv", encoding="cp949")
+    return info, realtime
 
-    df_info.columns = df_info.columns.str.strip()
-    df_live.columns = df_live.columns.str.strip()
+info_df, realtime_df = load_data()
 
-    # 병합
-    df = pd.merge(df_live, df_info, on="주차장코드", how="left")
+# -------------------------
+# 데이터 전처리 (컬럼명은 실제 파일에 맞게 수정 필요)
+# -------------------------
+# 예시 컬럼명 (필요시 수정!)
+# info_df: 주차장명, 자치구, 총주차면수
+# realtime_df: 주차장명, 현재주차대수, 주차가능대수
 
-    # 숫자 처리
-    df["총 주차면"] = pd.to_numeric(df["총 주차면"], errors="coerce")
-    df["현재 주차 차량수"] = pd.to_numeric(df["현재 주차 차량수"], errors="coerce")
+# 컬럼명 정리 (혹시 모를 공백 제거)
+info_df.columns = info_df.columns.str.strip()
+realtime_df.columns = realtime_df.columns.str.strip()
 
-    # -----------------------------
-    # ⭐ 데이터 품질 반영
-    # -----------------------------
-    df = df[df["총 주차면"] > 10]
+# 병합
+df = pd.merge(info_df, realtime_df, on="주차장명", how="left")
 
-    # 파생 변수
-    df["주차가능대수"] = df["총 주차면"] - df["현재 주차 차량수"]
-    df["이용률"] = df["현재 주차 차량수"] / df["총 주차면"]
+# -------------------------
+# 사이드바 필터
+# -------------------------
+gu_list = sorted(df["자치구"].dropna().unique())
+selected_gu = st.sidebar.selectbox("자치구 선택", ["전체"] + gu_list)
 
-    # -----------------------------
-    # ⭐ 혼잡도 기준 (보고서)
-    # -----------------------------
-    def status(rate):
-        if rate >= 0.95:
-            return "만차"
-        elif rate >= 0.7:
-            return "혼잡"
-        elif rate >= 0.3:
-            return "보통"
-        else:
-            return "여유"
+if selected_gu != "전체":
+    df = df[df["자치구"] == selected_gu]
 
-    df["상태"] = df["이용률"].apply(status)
-
-    # 좌표
-    lat_col = [c for c in df.columns if "위도" in c][0]
-    lon_col = [c for c in df.columns if "경도" in c][0]
-
-    df["lat"] = pd.to_numeric(df[lat_col], errors="coerce")
-    df["lon"] = pd.to_numeric(df[lon_col], errors="coerce")
-
-    df = df.dropna(subset=["lat", "lon"])
-
-    return df
-
-
-df = load_data()
-
-# ==============================
-# 헤더
-# ==============================
-st.title("🚗 Seoul ParkMap — 서울 공영주차장 실시간 현황")
-
-st.info("""
-📌 본 서비스는 서울시 공영주차장 데이터 분석 보고서를 기반으로 제작되었습니다.
-실시간 데이터는 일부 주차장에만 제공됩니다.
-""")
-
-# ==============================
+# -------------------------
 # KPI
-# ==============================
+# -------------------------
+total_parking = len(df)
+total_capacity = df["총주차면수"].sum()
+total_available = df["주차가능대수"].sum()
+
 col1, col2, col3 = st.columns(3)
+col1.metric("주차장 개수", f"{total_parking} 개")
+col2.metric("총 주차면", f"{int(total_capacity)} 면")
+col3.metric("현재 이용 가능", f"{int(total_available)} 면")
 
-col1.metric("주차장 수", len(df))
-col2.metric("평균 이용률", f"{df['이용률'].mean()*100:.1f}%")
-col3.metric("총 가용 주차면", int(df["주차가능대수"].sum()))
+# -------------------------
+# 구별 집계
+# -------------------------
+st.subheader("📊 자치구별 주차장 수")
 
-# ==============================
-# 필터
-# ==============================
-st.sidebar.title("🔍 필터")
-
-district_col = [c for c in df.columns if "구" in c][0]
-
-district = st.sidebar.selectbox(
-    "자치구",
-    ["전체"] + sorted(df[district_col].dropna().unique().tolist())
+gu_summary = (
+    df.groupby("자치구")
+    .agg(
+        주차장수=("주차장명", "count"),
+        총면수=("총주차면수", "sum"),
+        가능면수=("주차가능대수", "sum"),
+    )
+    .reset_index()
 )
 
-status_filter = st.sidebar.multiselect(
-    "혼잡도",
-    ["여유", "보통", "혼잡", "만차"],
-    default=["여유", "보통", "혼잡", "만차"]
-)
+st.dataframe(gu_summary, use_container_width=True)
 
-filtered_df = df.copy()
-
-if district != "전체":
-    filtered_df = filtered_df[filtered_df[district_col] == district]
-
-filtered_df = filtered_df[filtered_df["상태"].isin(status_filter)]
-
-# ==============================
-# 지도
-# ==============================
-st.subheader("📍 지도")
-
-def get_color(status):
-    if status == "여유":
-        return [0, 200, 0]
-    elif status == "보통":
-        return [0, 100, 255]
-    elif status == "혼잡":
-        return [255, 150, 0]
-    elif status == "만차":
-        return [255, 0, 0]
-    else:
-        return [150, 150, 150]
-
-filtered_df["color"] = filtered_df["상태"].apply(get_color)
-
-layer = pdk.Layer(
-    "ScatterplotLayer",
-    data=filtered_df,
-    get_position='[lon, lat]',
-    get_fill_color='color',
-    get_radius=80,
-    pickable=True,
-)
-
-view_state = pdk.ViewState(
-    latitude=filtered_df["lat"].mean(),
-    longitude=filtered_df["lon"].mean(),
-    zoom=11
-)
-
-st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state))
-
-# ==============================
-# 추천
-# ==============================
-st.subheader("⭐ 추천 주차장 (여유 TOP 5)")
-
-top5 = filtered_df.sort_values(
-    by=["주차가능대수", "이용률"],
-    ascending=[False, True]
-).head(5)
-
-st.dataframe(top5[[
-    "주차장명",
-    "주차가능대수",
-    "이용률",
-    "상태"
-]])
-
-# ==============================
-# 리스트 뷰 (기획서 핵심)
-# ==============================
-st.subheader("📋 주차장 리스트")
-
-sort_option = st.selectbox(
-    "정렬 기준",
-    ["가용대수순", "이용률순"]
-)
-
-if sort_option == "가용대수순":
-    list_df = filtered_df.sort_values(by="주차가능대수", ascending=False)
-else:
-    list_df = filtered_df.sort_values(by="이용률")
-
-st.dataframe(
-    list_df[[
-        "주차장명",
-        "주차가능대수",
-        "이용률",
-        "상태"
-    ]],
-    use_container_width=True
-)
-
-# ==============================
-# 자치구 분석
-# ==============================
-st.subheader("📊 자치구별 이용률")
-
-district_summary = filtered_df.groupby(district_col).agg({
-    "현재 주차 차량수": "sum",
-    "총 주차면": "sum"
-})
-
-district_summary["이용률"] = (
-    district_summary["현재 주차 차량수"] /
-    district_summary["총 주차면"]
-)
-
-st.bar_chart(district_summary["이용률"])
+# -------------------------
+# 상세 테이블
+# -------------------------
+st.subheader("📋 주차장 상세 정보")
+st.dataframe(df.head(100), use_container_width=True)
