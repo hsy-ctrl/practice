@@ -6,7 +6,9 @@ import folium
 import requests
 from folium.plugins import MarkerCluster, MiniMap
 from streamlit_folium import st_folium
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+KST = timezone(timedelta(hours=9))  # 한국 표준시 (UTC+9)
 
 # ─────────────────────────────────────────
 # 페이지 설정
@@ -118,7 +120,7 @@ def fetch_all(service: str, total_hint: int = 3000) -> list:
 # ─────────────────────────────────────────
 @st.cache_data(ttl=300)
 def load_data():
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S (KST)")
 
     # ① 공영주차장 안내 정보 (GetParkInfo)
     info_rows = fetch_all("GetParkInfo", total_hint=3000)
