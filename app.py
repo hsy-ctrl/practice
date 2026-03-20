@@ -593,7 +593,7 @@ with st.sidebar:
     st.markdown('<div style="font-family:JetBrains Mono,monospace;font-size:8px;color:#3d5470;letter-spacing:2px;margin-bottom:8px;">FILTER</div>', unsafe_allow_html=True)
     sel_gu     = st.multiselect("자치구",  GU_LIST,              placeholder="전체")
     sel_status = st.multiselect("혼잡도",  ["여유","보통","혼잡","만차"], placeholder="전체")
-    sel_fee    = st.multiselect("유무료",  ["유료","무료"],       placeholder="전체")
+    sel_fee    = []  # 유무료 필터 제거
 
     if "🗺️" in page:
         st.markdown("---")
