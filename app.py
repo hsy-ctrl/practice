@@ -345,7 +345,7 @@ PLOT_CFG = dict(
 # ══════════════════════════════════════════════════════
 # 지도 생성
 # ══════════════════════════════════════════════════════
-def make_map(rt_df, info_df, show_clusters, sel_gu):
+def make_map(rt_df, show_clusters, sel_gu):
     m = folium.Map(location=[37.5665, 126.9780], zoom_start=11,
                    tiles="CartoDB dark_matter", control_scale=True)
     MiniMap(tile_layer="CartoDB dark_matter", position="bottomright",
@@ -473,83 +473,6 @@ def make_map(rt_df, info_df, show_clusters, sel_gu):
             icon=folium.DivIcon(html=icon_html, icon_size=(34,34), icon_anchor=(17,34)),
         ).add_to(rt_target)
 
-    # 공영 전체 회색 핀
-    rt_names = set(rt_df["주차장명"].tolist())
-    gray_df = info_df.dropna(subset=["위도","경도"]).copy()
-    if sel_gu: gray_df = gray_df[gray_df["구"].isin(sel_gu)]
-    gray_df = gray_df[~gray_df["주차장명"].isin(rt_names)]
-
-    if show_clusters:
-        gray_cluster = MarkerCluster(options={"maxClusterRadius":60,"disableClusteringAtZoom":14})
-        gray_cluster.add_to(m)
-        gray_target = gray_cluster
-    else:
-        gray_target = m
-
-    for _, row in gray_df.iterrows():
-        try:
-            lat, lng = float(row["위도"]), float(row["경도"])
-            if not (-90<=lat<=90 and -180<=lng<=180): continue
-        except: continue
-
-        name  = str(row.get("주차장명",""))
-        addr  = str(row.get("주소",""))
-        total = int(row.get("총 주차면", 0))
-        fee   = int(row.get("기본 주차 요금", 0))
-        mfee  = int(row.get("일 최대 요금", 0))
-        paid  = str(row.get("유무료구분명","-"))
-        phone = str(row.get("전화번호","-"))
-        kind  = str(row.get("주차장 종류명","-"))
-        ops   = str(row.get("평일운영","-"))
-
-        gpopup = f"""
-<div style="font-family:'Noto Sans KR',sans-serif;width:250px;background:#060c18;
-  border:1px solid #182840;border-radius:12px;overflow:hidden;">
-  <div style="background:#0b1525;border-bottom:1px solid #182840;padding:12px 14px;">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:#1f3048;
-      letter-spacing:2px;margin-bottom:4px;">STATIC · NO REALTIME</div>
-    <div style="font-size:13px;font-weight:600;color:#b8d0e8;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{name}</div>
-    <div style="font-size:10px;color:#3d5470;margin-top:2px;">{addr}</div>
-  </div>
-  <div style="padding:12px 14px;">
-    <div style="background:#0b1525;border:1px solid #182840;border-radius:6px;
-      padding:10px;text-align:center;margin-bottom:10px;">
-      <div style="font-size:8px;color:#3d5470;letter-spacing:1px;margin-bottom:3px;">CAPACITY</div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:20px;
-        font-weight:700;color:#6a8aaa;">{total}<span style="font-size:11px;color:#3d5470"> 면</span></div>
-    </div>
-    <div style="display:grid;grid-template-columns:60px 1fr;gap:3px 8px;font-size:11px;">
-      <span style="color:#3d5470;">⏰ 운영</span><span style="color:#3d5470;">{ops}</span>
-      <span style="color:#3d5470;">💰 기본</span><span style="color:#3d5470;">{f"{fee:,}원/5분" if fee>0 else "무료"}</span>
-      <span style="color:#3d5470;">📞 전화</span><span style="color:#3d5470;">{phone if phone not in ("nan","") else "-"}</span>
-    </div>
-    <div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap;">
-      <span style="background:#0b1525;color:#1f3048;border:1px solid #182840;
-        border-radius:4px;padding:2px 7px;font-size:9px;">{kind}</span>
-      <span style="background:#0b1525;color:#1f3048;border:1px solid #182840;
-        border-radius:4px;padding:2px 7px;font-size:9px;">{paid}</span>
-    </div>
-  </div>
-</div>"""
-
-        gicon = """
-<div style="position:relative;width:22px;height:22px;">
-  <div style="position:absolute;inset:0;background:#182840;
-    border-radius:50% 50% 50% 0;transform:rotate(-45deg);
-    border:1px solid #1f3048;box-shadow:0 1px 4px rgba(0,0,0,.5);"></div>
-  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
-    <span style="font-family:'JetBrains Mono',monospace;font-size:7px;
-      font-weight:700;color:#3d5470;transform:translateY(-1px);">P</span>
-  </div>
-</div>"""
-
-        folium.Marker(
-            location=[lat, lng],
-            popup=folium.Popup(gpopup, max_width=260),
-            tooltip=f"<b>{name}</b><br><span style='color:#3d5470'>총 {total}면 · 미연계</span>",
-            icon=folium.DivIcon(html=gicon, icon_size=(22,22), icon_anchor=(11,22)),
-        ).add_to(gray_target)
 
     return m
 
@@ -702,7 +625,7 @@ if "🗺️" in page:
     map_col, side_col = st.columns([3, 1])
 
     with map_col:
-        m = make_map(fr, fi, show_clusters, sel_gu)
+        m = make_map(fr, show_clusters, sel_gu)
         st_folium(m, width="100%", height=580, returned_objects=[], key="pk_map")
 
     with side_col:
