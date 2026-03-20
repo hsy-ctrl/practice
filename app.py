@@ -33,11 +33,10 @@ html, body, [class*="css"] { font-family: 'Noto Sans KR', sans-serif; }
 
 
 # ─────────────────────────────────────────
-# CSV 경로 자동 탐색
+# CSV 경로 — app.py 위치 기준으로 자동 탐색
+# ★ 수정 핵심: 터미널 실행 위치와 무관하게 app.py 옆 폴더에서 찾음
 # ─────────────────────────────────────────
-# app.py 기준으로 같은 폴더에서 CSV 파일을 찾습니다.
 BASE_DIR = Path(__file__).parent
-
 INFO_CSV = BASE_DIR / "서울시_공영주차장_안내_정보.csv"
 RT_CSV   = BASE_DIR / "서울시_시영주차장_실시간_주차대수_정보.csv"
 
@@ -47,50 +46,57 @@ RT_CSV   = BASE_DIR / "서울시_시영주차장_실시간_주차대수_정보.c
 # ─────────────────────────────────────────
 @st.cache_data
 def load_data():
-    # ── CSV 존재 여부 체크 ──────────────────────────────────
     if not INFO_CSV.exists():
-        st.error(f"❌ 파일을 찾을 수 없습니다: {INFO_CSV}\n\n"
-                 f"app.py와 같은 폴더({BASE_DIR})에 CSV 파일 2개를 넣어주세요.")
+        st.error(
+            f"**CSV 파일을 찾을 수 없습니다.**\n\n"
+            f"`서울시_공영주차장_안내_정보.csv` 파일을 "
+            f"`app.py`와 **같은 폴더**에 넣어주세요.\n\n"
+            f"현재 찾는 경로: `{INFO_CSV}`"
+        )
         st.stop()
     if not RT_CSV.exists():
-        st.error(f"❌ 파일을 찾을 수 없습니다: {RT_CSV}\n\n"
-                 f"app.py와 같은 폴더({BASE_DIR})에 CSV 파일 2개를 넣어주세요.")
+        st.error(
+            f"**CSV 파일을 찾을 수 없습니다.**\n\n"
+            f"`서울시_시영주차장_실시간_주차대수_정보.csv` 파일을 "
+            f"`app.py`와 **같은 폴더**에 넣어주세요.\n\n"
+            f"현재 찾는 경로: `{RT_CSV}`"
+        )
         st.stop()
 
     info = pd.read_csv(INFO_CSV, encoding="euc-kr")
     rt   = pd.read_csv(RT_CSV,   encoding="euc-kr")
 
-    # ── 구 추출 ────────────────────────────────────────────
+    # 구 추출
     info["구"] = info["주소"].str.extract(r"([\w]+구)")
     rt["구"]   = rt["주소"].str.extract(r"([\w]+구)")
 
-    # ── info: 숫자 컬럼 NaN → 0 처리 [수정1] ──────────────
+    # ★ 수정: info 숫자 컬럼 NaN → 0 (format 오류 방지)
     for col in ["총 주차면", "기본 주차 요금", "기본 주차 시간(분 단위)",
                 "추가 단위 요금", "추가 단위 시간(분 단위)",
                 "일 최대 요금", "월 정기권 금액"]:
         if col in info.columns:
             info[col] = pd.to_numeric(info[col], errors="coerce").fillna(0)
 
-    # ── rt: 이상치 제거(총 주차면 10 이하) ────────────────
+    # 이상치 제거 (총 주차면 10 이하)
     rt = rt[rt["총 주차면"] > 10].copy()
 
-    # ── rt: 숫자 컬럼 NaN → 0 처리 [수정2] ────────────────
+    # ★ 수정: rt 숫자 컬럼 NaN → 0
     for col in ["기본 주차 요금", "일 최대 요금"]:
         if col in rt.columns:
             rt[col] = pd.to_numeric(rt[col], errors="coerce").fillna(0)
 
-    # ── rt: 파생 컬럼 ──────────────────────────────────────
+    # 파생 컬럼
     rt["이용률"] = (rt["현재 주차 차량수"] / rt["총 주차면"] * 100).round(1).clip(0, 100)
     rt["가용면"] = (rt["총 주차면"] - rt["현재 주차 차량수"]).clip(lower=0)
 
-    # Categorical → str 변환 [수정3]: Streamlit Arrow 직렬화 오류 방지
+    # ★ 수정: Categorical → str (Streamlit Arrow 직렬화 오류 방지)
     rt["혼잡도"] = pd.cut(
         rt["이용률"],
         bins=[-1, 30, 70, 95, 100],
         labels=["여유", "보통", "혼잡", "만차"],
     ).astype(str)
 
-    # ── 구별 집계 — 실시간 ────────────────────────────────
+    # 구별 집계 — 실시간
     gu_rt = (
         rt.groupby("구")
         .agg(주차장수=("주차장코드", "count"),
@@ -101,7 +107,7 @@ def load_data():
     )
     gu_rt["이용률"] = (gu_rt["현재차량"] / gu_rt["총주차면"] * 100).round(1)
 
-    # ── 구별 집계 — 전체 공영 ─────────────────────────────
+    # 구별 집계 — 전체 공영
     gu_info = (
         info.groupby("구")
         .agg(전체주차장수=("주차장코드", "count"),
@@ -138,9 +144,9 @@ with st.sidebar:
     )
     st.markdown("---")
     st.markdown("**필터**")
-    sel_gu   = st.multiselect("자치구",    GU_LIST,                                       placeholder="전체")
+    sel_gu   = st.multiselect("자치구",    GU_LIST,                                        placeholder="전체")
     sel_kind = st.multiselect("주차장 종류", info["주차장 종류명"].dropna().unique().tolist(), placeholder="전체")
-    sel_fee  = st.multiselect("유무료",    ["유료", "무료"],                               placeholder="전체")
+    sel_fee  = st.multiselect("유무료",    ["유료", "무료"],                                placeholder="전체")
     st.markdown("---")
     st.caption(f"📡 데이터 기준: {UPDATE_TIME[:16]}")
     st.caption("출처: 서울 열린데이터 광장")
@@ -332,7 +338,6 @@ elif "주차장 목록" in view:
 
     tab1, tab2 = st.tabs(["🔴 실시간 현황 (180개소)", "📁 전체 공영주차장 (2,579개소)"])
 
-    # ── 실시간 탭 ──────────────────────────────────────────
     with tab1:
         fr2 = filt(rt)
 
@@ -371,7 +376,6 @@ elif "주차장 목록" in view:
             file_name="실시간_주차현황.csv", mime="text/csv",
         )
 
-    # ── 전체 공영 탭 ───────────────────────────────────────
     with tab2:
         fi2 = filt(info)
 
@@ -402,11 +406,11 @@ elif "주차장 목록" in view:
 
         st.dataframe(
             disp_info.style.format({
-                "총 주차면":    "{:,.0f}",
-                "기본요금(원)": "{:,.0f}",
-                "기본시간(분)": "{:,.0f}",
+                "총 주차면":      "{:,.0f}",
+                "기본요금(원)":   "{:,.0f}",
+                "기본시간(분)":   "{:,.0f}",
                 "일최대요금(원)": "{:,.0f}",
-                "월정기권(원)": "{:,.0f}",
+                "월정기권(원)":   "{:,.0f}",
             }),
             use_container_width=True, height=460, hide_index=True,
         )
