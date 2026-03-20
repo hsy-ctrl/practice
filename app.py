@@ -135,14 +135,23 @@ def load_data():
     rt = pd.DataFrame(rt_rows)
 
     # ── 실제 API 컬럼명 → 한글 통일 ─────────────────
-    # GetParkInfo 실제 응답 컬럼 기준 (혼합: 일부 한글, 일부 영문)
-    INFO_COL_MAP = {
+    # GetParkInfo 실제 확인 컬럼: ADDR, PKLT_CD, OPER_SE, OPER_SE_NM,
+    #   SAT_CHGD_FREE_SE, SAT_CHGD_FREE_NM, LAT 가 영문
+    #   나머지는 이미 한글로 내려옴
+    COMMON_MAP = {
+        "ADDR":                 "주소",
+        "PKLT_CD":              "주차장코드",
         "PKLT_NM":              "주차장명",
+        "OPER_SE":              "운영구분",
+        "OPER_SE_NM":           "운영구분명",
+        "SAT_CHGD_FREE_SE":     "토요일 유,무료 구분",
+        "SAT_CHGD_FREE_NM":     "토요일 유,무료 구분명",
+        "LAT":                  "위도",
+        "LOT":                  "경도",
+        # 추가 버전 대비
         "PKLT_KND":             "주차장 종류",
         "PKLT_KND_NM":          "주차장 종류명",
         "TELNO":                "전화번호",
-        "PRK_NOW_INFO_PVSN_YN":    "주차현황 정보 제공여부",
-        "PRK_NOW_INFO_PVSN_YN_NM": "주차현황 정보 제공여부명",
         "TPKCT":                "총 주차면",
         "CHGD_FREE_SE":         "유무료구분",
         "CHGD_FREE_NM":         "유무료구분명",
@@ -168,51 +177,15 @@ def load_data():
         "BUS_PRK_ADD_HM":       "버스 추가 단위 시간(분 단위)",
         "BUS_PRK_ADD_CRG":      "버스 추가 단위 요금",
         "DLY_MAX_CRG":          "일 최대 요금",
-        "LOT":                  "경도",
-    }
-    # GetParkingInfo 도 동일 패턴으로 매핑
-    RT_COL_MAP = {
-        "PKLT_NM":              "주차장명",
-        "PKLT_CD":              "주차장코드",
-        "PKLT_KND":             "주차장 종류",
-        "PKLT_KND_NM":          "주차장 종류명",
-        "TELNO":                "전화번호",
-        "PRK_NOW_INFO_PVSN_YN":    "주차현황 정보 제공여부",
-        "PRK_NOW_INFO_PVSN_YN_NM": "주차현황 정보 제공여부명",
-        "TPKCT":                "총 주차면",
+        # GetParkingInfo 실시간 전용
         "NOW_PRK_VHCL_CNT":     "현재 주차 차량수",
         "NOW_PRK_VHCL_UPDT_TM": "현재 주차 차량수 업데이트시간",
-        # 혹시 다른 컬럼명일 경우 대비
         "CUR_PARKING":          "현재 주차 차량수",
         "CUR_PARKING_TIME":     "현재 주차 차량수 업데이트시간",
         "CAPACITY":             "총 주차면",
-        "CHGD_FREE_SE":         "유무료구분",
-        "CHGD_FREE_NM":         "유무료구분명",
-        "NGHT_FREE_OPN_YN":     "야간무료개방여부",
-        "NGHT_FREE_OPN_YN_NAME":"야간무료개방여부명",
-        "WD_OPER_BGNG_TM":      "평일 운영 시작시각(HHMM)",
-        "WD_OPER_END_TM":       "평일 운영 종료시각(HHMM)",
-        "WE_OPER_BGNG_TM":      "주말 운영 시작시각(HHMM)",
-        "WE_OPER_END_TM":       "주말 운영 종료시각(HHMM)",
-        "LHLDY_BGNG":           "공휴일 운영 시작시각(HHMM)",
-        "LHLDY":                "공휴일 운영 종료시각(HHMM)",
-        "LHLDY_YN":             "공휴일 유,무료 구분",
-        "LHLDY_NM":             "공휴일 유,무료 구분명",
-        "MNTL_CMUT_CRG":        "월 정기권 금액",
-        "CRB_PKLT_MNG_GROUP_NO":"노상 주차장 관리그룹번호",
-        "PRK_CRG":              "기본 주차 요금",
-        "PRK_HM":               "기본 주차 시간(분 단위)",
-        "ADD_CRG":              "추가 단위 요금",
-        "ADD_UNIT_TM_MNT":      "추가 단위 시간(분 단위)",
-        "BUS_PRK_CRG":          "버스 기본 주차 요금",
-        "BUS_PRK_HM":           "버스 기본 주차 시간(분 단위)",
-        "BUS_PRK_ADD_HM":       "버스 추가 단위 시간(분 단위)",
-        "BUS_PRK_ADD_CRG":      "버스 추가 단위 요금",
-        "DLY_MAX_CRG":          "일 최대 요금",
-        "LOT":                  "경도",
-        "LAT":                  "위도",
     }
-
+    INFO_COL_MAP = COMMON_MAP
+    RT_COL_MAP   = COMMON_MAP
     info = info.rename(columns=INFO_COL_MAP)
     rt   = rt.rename(columns=RT_COL_MAP)
 
