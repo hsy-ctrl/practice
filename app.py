@@ -351,7 +351,7 @@ def style_util(df, col="이용률(%)"):
 # ─────────────────────────────────────────
 # Folium 지도 생성
 # ─────────────────────────────────────────
-def make_map(data, show_clusters, sel_gu_list):
+def make_map(data, info_data, show_clusters, sel_gu_list):
     m = folium.Map(
         location=[37.5665, 126.9780],
         zoom_start=11,
@@ -448,6 +448,78 @@ def make_map(data, show_clusters, sel_gu_list):
             tooltip=f"<b>{name}</b><br>이용률 {rate:.0f}% | 가용 {avail}면",
             icon=folium.DivIcon(html=icon_html, icon_size=(34,34), icon_anchor=(17,34)),
         ).add_to(target)
+
+    # ── 공영주차장 전체 (위경도 있는 것) — 회색 핀으로 추가 ──
+    # 실시간 데이터 주차장명 목록 (중복 방지)
+    rt_names = set(data["주차장명"].tolist()) if len(data) > 0 else set()
+
+    info_df = info_data.dropna(subset=["위도","경도"]).copy()
+    if sel_gu_list:
+        info_df = info_df[info_df["구"].isin(sel_gu_list)]
+
+    # 실시간에 없는 것만 (이미 위에서 표시된 건 제외)
+    info_df = info_df[~info_df["주차장명"].isin(rt_names)]
+
+    # 회색 핀용 레이어 (클러스터 별도 적용)
+    gray_target = MarkerCluster(options={"maxClusterRadius":50,"disableClusteringAtZoom":14}) if show_clusters else m
+    if show_clusters:
+        gray_target.add_to(m)
+
+    for _, row in info_df.iterrows():
+        try:
+            lat, lng = float(row["위도"]), float(row["경도"])
+            if not (-90 <= lat <= 90 and -180 <= lng <= 180): continue
+        except: continue
+
+        name  = str(row.get("주차장명", ""))
+        addr  = str(row.get("주소", ""))
+        total = int(row.get("총 주차면", 0))
+        fee   = int(row.get("기본 주차 요금", 0))
+        max_fee = int(row.get("일 최대 요금", 0))
+        paid  = str(row.get("유무료구분명", "-"))
+        phone = str(row.get("전화번호", "-"))
+        kind  = str(row.get("주차장 종류명", "-"))
+        ops   = str(row.get("평일운영", "-")) if "평일운영" in row.index else "-"
+
+        gray_popup = f"""
+<div style="font-family:'Noto Sans KR',sans-serif; width:260px; background:#161b22;
+     border-radius:12px; overflow:hidden; border:1px solid #30363d;">
+  <div style="background:#30363d; border-bottom:2px solid #484f58; padding:12px 14px;">
+    <div style="font-size:13px; font-weight:700; color:#f0f6fc; margin-bottom:2px;">{name}</div>
+    <div style="font-size:11px; color:#8b949e;">{addr}</div>
+  </div>
+  <div style="padding:12px 14px;">
+    <div style="background:#21262d; border-radius:8px; padding:10px; text-align:center; margin-bottom:10px;">
+      <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">총 주차면</div>
+      <div style="font-size:22px; font-weight:700; color:#c9d1d9;">{total}면</div>
+      <div style="font-size:10px; color:#6e7681; margin-top:2px;">실시간 현황 미연계</div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px;">
+      <div style="color:#8b949e;">💰 기본요금</div><div style="color:#c9d1d9; text-align:right;">{f"{fee:,}원/5분" if fee > 0 else "무료"}</div>
+      <div style="color:#8b949e;">📅 일 최대</div><div style="color:#c9d1d9; text-align:right;">{f"{max_fee:,}원" if max_fee > 0 else "-"}</div>
+      <div style="color:#8b949e;">📞 전화</div><div style="color:#c9d1d9; text-align:right;">{phone if phone != "nan" else "-"}</div>
+    </div>
+    <div style="margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;">
+      <span style="background:#21262d; color:#6e7681; border:1px solid #30363d; border-radius:6px; padding:3px 8px; font-size:11px;">정보없음</span>
+      <span style="background:#21262d; color:#8b949e; border-radius:6px; padding:3px 8px; font-size:11px;">{kind}</span>
+      <span style="background:#21262d; color:#8b949e; border-radius:6px; padding:3px 8px; font-size:11px;">{paid}</span>
+    </div>
+  </div>
+</div>"""
+
+        gray_icon = """
+<div style="width:26px;height:26px;background:#484f58;border-radius:50% 50% 50% 0;
+  transform:rotate(-45deg);border:1.5px solid rgba(255,255,255,0.15);
+  display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,0.4);">
+  <div style="transform:rotate(45deg);font-size:8px;font-weight:700;color:#c9d1d9;">P</div>
+</div>"""
+
+        folium.Marker(
+            location=[lat, lng],
+            popup=folium.Popup(gray_popup, max_width=280),
+            tooltip=f"<b>{name}</b><br>총 {total}면 | 실시간 미연계",
+            icon=folium.DivIcon(html=gray_icon, icon_size=(26,26), icon_anchor=(13,26)),
+        ).add_to(gray_target)
 
     return m
 
@@ -568,6 +640,7 @@ if "🗺️" in page:
       <div class="legend-item"><div class="legend-dot" style="background:#388bfd"></div>보통 (30~70%)</div>
       <div class="legend-item"><div class="legend-dot" style="background:#e3b341"></div>혼잡 (70~95%)</div>
       <div class="legend-item"><div class="legend-dot" style="background:#f85149"></div>만차 (95% 이상)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#484f58"></div>실시간 미연계</div>
       <div class="legend-item" style="margin-left:auto; color:#8b949e; font-size:11px;">📍 핀 클릭 시 상세 정보</div>
     </div>
     """, unsafe_allow_html=True)
@@ -575,7 +648,7 @@ if "🗺️" in page:
     map_col, stat_col = st.columns([3, 1])
 
     with map_col:
-        m = make_map(fr, show_clusters, sel_gu)
+        m = make_map(fr, fi, show_clusters, sel_gu)
         st_folium(m, width="100%", height=560, returned_objects=[], key="main_map")
 
     with stat_col:
