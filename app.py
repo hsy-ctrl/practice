@@ -134,6 +134,110 @@ def load_data():
         st.stop()
     rt = pd.DataFrame(rt_rows)
 
+    # ── 영문 컬럼명 → 한글 컬럼명 변환 ──────────────
+    # 서울 Open API는 영문 키로 응답하는 경우가 있음
+    INFO_COL_MAP = {
+        "PARKING_CODE":        "주차장코드",
+        "PARKING_NAME":        "주차장명",
+        "ADDR":                "주소",
+        "PARKING_TYPE":        "주차장 종류",
+        "PARKING_TYPE_NM":     "주차장 종류명",
+        "OPER_SE":             "운영구분",
+        "OPER_SE_NM":          "운영구분명",
+        "TEL":                 "전화번호",
+        "PKLT_CD":             "주차현황 정보 제공여부",
+        "PKLT_CD_NM":          "주차현황 정보 제공여부명",
+        "CAPACITY":            "총 주차면",
+        "PRK_STTS_YN":         "유무료구분",
+        "PRK_STTS_NM":         "유무료구분명",
+        "NGHT_FREE_OPEN_YN":   "야간무료개방여부",
+        "NGHT_FREE_OPEN_NM":   "야간무료개방여부명",
+        "WEEKDAY_BEGIN_TIME":  "평일 운영 시작시각(HHMM)",
+        "WEEKDAY_END_TIME":    "평일 운영 종료시각(HHMM)",
+        "WEEKEND_BEGIN_TIME":  "주말 운영 시작시각(HHMM)",
+        "WEEKEND_END_TIME":    "주말 운영 종료시각(HHMM)",
+        "HOLIDAY_BEGIN_TIME":  "공휴일 운영 시작시각(HHMM)",
+        "HOLIDAY_END_TIME":    "공휴일 운영 종료시각(HHMM)",
+        "SYNC_TIME":           "최종데이터 동기화 시간",
+        "SAT_CHGD_FREE_SE":    "토요일 유,무료 구분",
+        "SAT_CHGD_FREE_NM":    "토요일 유,무료 구분명",
+        "HOLIDAY_CHGD_FREE_SE":"공휴일 유,무료 구분",
+        "HOLIDAY_CHGD_FREE_NM":"공휴일 유,무료 구분명",
+        "MTCP_AMT":            "월 정기권 금액",
+        "GRND_PK_MGMT_GRP_NO": "노상 주차장 관리그룹번호",
+        "BSC_PRK_CRG":         "기본 주차 요금",
+        "BSC_PRK_HR":          "기본 주차 시간(분 단위)",
+        "ADD_UNIT_CRG":        "추가 단위 요금",
+        "ADD_UNIT_HR":         "추가 단위 시간(분 단위)",
+        "BUS_BSC_PRK_CRG":     "버스 기본 주차 요금",
+        "BUS_BSC_PRK_HR":      "버스 기본 주차 시간(분 단위)",
+        "BUS_ADD_UNIT_HR":     "버스 추가 단위 시간(분 단위)",
+        "BUS_ADD_UNIT_CRG":    "버스 추가 단위 요금",
+        "DAY_MAX_CRG":         "일 최대 요금",
+        "LAT":                 "위도",
+        "LNG":                 "경도",
+    }
+    RT_COL_MAP = {
+        "PARKING_CODE":        "주차장코드",
+        "PARKING_NAME":        "주차장명",
+        "ADDR":                "주소",
+        "PARKING_TYPE":        "주차장 종류",
+        "PARKING_TYPE_NM":     "주차장 종류명",
+        "OPER_SE":             "운영구분",
+        "OPER_SE_NM":          "운영구분명",
+        "TEL":                 "전화번호",
+        "PKLT_CD":             "주차현황 정보 제공여부",
+        "PKLT_CD_NM":          "주차현황 정보 제공여부명",
+        "CAPACITY":            "총 주차면",
+        "CUR_PARKING":         "현재 주차 차량수",
+        "CUR_PARKING_TIME":    "현재 주차 차량수 업데이트시간",
+        "PRK_STTS_YN":         "유무료구분",
+        "PRK_STTS_NM":         "유무료구분명",
+        "NGHT_FREE_OPEN_YN":   "야간무료개방여부",
+        "NGHT_FREE_OPEN_NM":   "야간무료개방여부명",
+        "WEEKDAY_BEGIN_TIME":  "평일 운영 시작시각(HHMM)",
+        "WEEKDAY_END_TIME":    "평일 운영 종료시각(HHMM)",
+        "WEEKEND_BEGIN_TIME":  "주말 운영 시작시각(HHMM)",
+        "WEEKEND_END_TIME":    "주말 운영 종료시각(HHMM)",
+        "HOLIDAY_BEGIN_TIME":  "공휴일 운영 시작시각(HHMM)",
+        "HOLIDAY_END_TIME":    "공휴일 운영 종료시각(HHMM)",
+        "SAT_CHGD_FREE_SE":    "토요일 유,무료 구분",
+        "SAT_CHGD_FREE_NM":    "토요일 유,무료 구분명",
+        "HOLIDAY_CHGD_FREE_SE":"공휴일 유,무료 구분",
+        "HOLIDAY_CHGD_FREE_NM":"공휴일 유,무료 구분명",
+        "MTCP_AMT":            "월 정기권 금액",
+        "GRND_PK_MGMT_GRP_NO": "노상 주차장 관리그룹번호",
+        "BSC_PRK_CRG":         "기본 주차 요금",
+        "BSC_PRK_HR":          "기본 주차 시간(분 단위)",
+        "ADD_UNIT_CRG":        "추가 단위 요금",
+        "ADD_UNIT_HR":         "추가 단위 시간(분 단위)",
+        "BUS_BSC_PRK_CRG":     "버스 기본 주차 요금",
+        "BUS_BSC_PRK_HR":      "버스 기본 주차 시간(분 단위)",
+        "BUS_ADD_UNIT_CRG":    "버스 추가 단위 요금",
+        "BUS_ADD_UNIT_HR":     "버스 추가 단위 시간(분 단위)",
+        "DAY_MAX_CRG":         "일 최대 요금",
+        "SHARE_PKLT_MGMT_NM":  "공유 주차장 관리업체명",
+        "SHARE_PKLT_YN":       "공유 주차장 여부",
+        "SHARE_PKLT_LINK":     "공유 주차장 관리업체 링크",
+        "ETC_CNT":             "공유 주차장 기타사항",
+    }
+
+    # 실제 컬럼이 영문이면 한글로 rename
+    if "ADDR" in info.columns:
+        info = info.rename(columns=INFO_COL_MAP)
+    if "ADDR" in rt.columns:
+        rt = rt.rename(columns=RT_COL_MAP)
+
+    # 필수 컬럼 없으면 실제 컬럼 출력해서 디버그
+    for req in ["주소", "주차장코드", "총 주차면"]:
+        if req not in info.columns:
+            st.error(f"API 응답에 '{req}' 컬럼이 없습니다.\n\n실제 컬럼: {info.columns.tolist()}")
+            st.stop()
+    for req in ["주소", "주차장코드", "총 주차면", "현재 주차 차량수"]:
+        if req not in rt.columns:
+            st.error(f"실시간 API 응답에 '{req}' 컬럼이 없습니다.\n\n실제 컬럼: {rt.columns.tolist()}")
+            st.stop()
+
     # ── 전처리 ────────────────────────────────────────
     info["구"] = info["주소"].str.extract(r"([\w]+구)")
     rt["구"]   = rt["주소"].str.extract(r"([\w]+구)")
