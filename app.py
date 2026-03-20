@@ -679,7 +679,8 @@ elif "📋" in page:
         with c2:
             sort_opt = st.selectbox("정렬", ["이용률 높은 순","이용률 낮은 순","가용면 많은 순"], label_visibility="collapsed")
         sm = {"이용률 높은 순":("이용률",False),"이용률 낮은 순":("이용률",True),"가용면 많은 순":("가용면",False)}
-        fr2 = fr2.sort_values(*sm[sort_opt])
+        sc, asc = sm[sort_opt]
+        fr2 = fr2.sort_values(by=sc, ascending=asc)
 
         mc1, mc2, mc3, mc4 = st.columns(4)
         mc1.metric("조회 주차장", f"{len(fr2)}개소")
