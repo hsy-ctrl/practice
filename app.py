@@ -628,15 +628,15 @@ elif "📊" in page:
     col3, col4 = st.columns(2)
     with col3:
         st.markdown("#### 구별 전체 주차면 순위")
-        srt = merged.sort_values("전체주차면", ascending=True)
+        srt = disp.sort_values("전체 주차면", ascending=True)
         fig3 = go.Figure(go.Bar(
-            x=srt["전체주차면"], y=srt["자치구"], orientation="h",
+            x=srt["전체 주차면"], y=srt["자치구"], orientation="h",
             marker=dict(
-                color=srt["전체주차면"],
+                color=srt["전체 주차면"],
                 colorscale=[[0,"#1c2128"],[1,"#388bfd"]],
             ),
             marker_line_width=0,
-            text=srt["전체주차면"].map(lambda v: f"{int(v):,}"), textposition="outside",
+            text=srt["전체 주차면"].map(lambda v: f"{int(v):,}"), textposition="outside",
             textfont=dict(size=10, color="#8b949e"),
         ))
         fig3.update_layout(**PLOT_CFG, height=max(340, len(srt)*26+40),
@@ -646,7 +646,7 @@ elif "📊" in page:
 
     with col4:
         st.markdown("#### 구별 실시간 이용률")
-        srt2 = merged.sort_values("이용률(%)", ascending=True)
+        srt2 = disp.sort_values("이용률(%)", ascending=True)
         fig4 = go.Figure(go.Bar(
             x=srt2["이용률(%)"], y=srt2["자치구"], orientation="h",
             marker_color=[status_color(v)[0] for v in srt2["이용률(%)"]],
